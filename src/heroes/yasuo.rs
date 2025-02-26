@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::config::hero::{HeroConfig, Key, KeyAction, MouseButton};
+use crate::config::hero::{HeroConfig, Key, KeyAction};
 
 pub fn create_config() -> HeroConfig {
     let mut config = HeroConfig::new("yasuo");

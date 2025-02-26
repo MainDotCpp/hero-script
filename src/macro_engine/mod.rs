@@ -72,8 +72,10 @@ impl MacroEngine {
                 if self.check_combo_trigger(trigger) {
                     debug!("触发连招: {}", combo_name);
                     
+                    // 修复：克隆整个KeyboardSimulator而不是引用
+                    let mut simulator = KeyboardSimulator::new();
+                    
                     // 执行连招动作
-                    let mut simulator = self.keyboard_simulator.as_ref().clone();
                     simulator.execute_actions(&action.keys);
                     
                     // 更新屏蔽按键

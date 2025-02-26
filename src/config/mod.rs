@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use serde_json;
-use self::hero::HeroConfig;
 
-// 导出HeroConfig以便app.rs可以引用
+// 直接导出HeroConfig以便app.rs可以引用
 pub use self::hero::HeroConfig;
 
 pub struct ConfigManager {

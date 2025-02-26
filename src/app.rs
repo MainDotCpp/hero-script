@@ -3,7 +3,7 @@ use tokio::runtime::Runtime;
 use log::{info, error, debug};
 
 use crate::keyboard::{KeyboardListener, KeyboardSimulator};
-use crate::config::{ConfigManager, HeroConfig};
+use crate::config::{ConfigManager, hero::HeroConfig};
 use crate::macro_engine::MacroEngine;
 use crate::heroes::HeroRegistry;
 use crate::ui::TrayMenu;

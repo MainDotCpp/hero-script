@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use crate::config::hero::{HeroConfig, Key, KeyAction};
+use crate::config::hero::{HeroConfig, Key};
 
 pub fn create_empty_config(name: &str) -> HeroConfig {
     let mut config = HeroConfig::new(name);
