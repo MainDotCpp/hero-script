@@ -16,43 +16,60 @@ impl KeyboardSimulator {
     }
     
     pub fn execute_actions(&mut self, actions: &[KeyAction]) {
+        debug!("执行键盘动作: {:?}", actions);
+        
         for action in actions {
             match action {
                 KeyAction::Press(key) => {
                     self.press_key(key);
+                    // 添加短暂延迟确保按键被识别
+                    thread::sleep(Duration::from_millis(50));
                 },
-                KeyAction::Down(key) => {
-                    self.key_down(key);
+                KeyAction::Release(key) => {
+                    self.release_key(key);
+                    thread::sleep(Duration::from_millis(50));
                 },
-                KeyAction::Up(key) => {
-                    self.key_up(key);
+                KeyAction::Type(key) => {
+                    self.press_key(key);
+                    thread::sleep(Duration::from_millis(50));
+                    self.release_key(key);
+                    thread::sleep(Duration::from_millis(50));
                 },
                 KeyAction::Delay(ms) => {
-                    thread::sleep(Duration::from_millis(*ms));
+                    debug!("延迟 {}ms", ms);
+                    thread::sleep(Duration::from_millis(*ms as u64));
                 },
                 KeyAction::MouseClick(x, y, button) => {
                     self.mouse_click(*x, *y, button);
                 },
             }
         }
+        
+        debug!("键盘动作执行完成");
     }
     
     fn press_key(&mut self, key: &Key) {
-        let enigo_key = self.convert_key(key);
-        self.enigo.key_click(enigo_key);
-        debug!("模拟按键: {:?}", key);
+        debug!("按下键: {:?}", key);
+        match self.key_to_enigo_key(key) {
+            Some(enigo_key) => {
+                self.enigo.key_down(enigo_key);
+            },
+            None => {
+                error!("无法映射按键: {:?}", key);
+            }
+        }
     }
     
-    fn key_down(&mut self, key: &Key) {
-        let enigo_key = self.convert_key(key);
-        self.enigo.key_down(enigo_key);
-        debug!("模拟按下: {:?}", key);
-    }
-    
-    fn key_up(&mut self, key: &Key) {
-        let enigo_key = self.convert_key(key);
-        self.enigo.key_up(enigo_key);
-        debug!("模拟松开: {:?}", key);
+    fn release_key(&mut self, key: &Key) {
+        debug!("释放键: {:?}", key);
+        match self.key_to_enigo_key(key) {
+            Some(enigo_key) => {
+                self.enigo.key_up(enigo_key);
+            },
+            None => {
+                error!("无法映射按键: {:?}", key);
+            }
+        }
     }
     
     fn mouse_click(&mut self, x: i32, y: i32, button: &MouseButton) {
@@ -75,25 +92,35 @@ impl KeyboardSimulator {
         debug!("模拟鼠标点击: 偏移({}, {}), 按钮: {:?}", x, y, button);
     }
     
-    fn convert_key(&self, key: &Key) -> EnigoKey {
+    fn key_to_enigo_key(&self, key: &Key) -> Option<EnigoKey> {
         match key {
-            Key::Character(c) => EnigoKey::Layout(*c),
-            Key::Escape => EnigoKey::Escape,
-            Key::Tab => EnigoKey::Tab,
-            Key::CapsLock => EnigoKey::CapsLock,
-            Key::Shift => EnigoKey::Shift,
-            Key::Control => EnigoKey::Control,
-            Key::Alt => EnigoKey::Alt,
-            Key::Space => EnigoKey::Space,
-            Key::Enter => EnigoKey::Return,
-            // 功能键
-            Key::F1 => EnigoKey::F1,
-            Key::F2 => EnigoKey::F2,
-            // 更多按键映射...
-            _ => {
-                error!("未实现的按键类型: {:?}", key);
-                EnigoKey::Layout('\0')
-            }
+            Key::Character(c) => {
+                match c {
+                    'a'..='z' | 'A'..='Z' | '0'..='9' => Some(EnigoKey::Layout(*c)),
+                    _ => None,
+                }
+            },
+            Key::F1 => Some(EnigoKey::F1),
+            Key::F2 => Some(EnigoKey::F2),
+            Key::F3 => Some(EnigoKey::F3),
+            Key::F4 => Some(EnigoKey::F4),
+            Key::F5 => Some(EnigoKey::F5),
+            Key::F6 => Some(EnigoKey::F6),
+            Key::F7 => Some(EnigoKey::F7),
+            Key::F8 => Some(EnigoKey::F8),
+            Key::F9 => Some(EnigoKey::F9),
+            Key::F10 => Some(EnigoKey::F10),
+            Key::F11 => Some(EnigoKey::F11),
+            Key::F12 => Some(EnigoKey::F12),
+            Key::Escape => Some(EnigoKey::Escape),
+            Key::Tab => Some(EnigoKey::Tab),
+            Key::CapsLock => Some(EnigoKey::CapsLock),
+            Key::Shift => Some(EnigoKey::Shift),
+            Key::Control => Some(EnigoKey::Control),
+            Key::Alt => Some(EnigoKey::Alt),
+            Key::Space => Some(EnigoKey::Space),
+            Key::Enter => Some(EnigoKey::Return),
+            _ => None,
         }
     }
 } 

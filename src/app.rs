@@ -178,6 +178,13 @@ impl App {
                                 if let Ok(mut curr_hero) = active_hero.lock() {
                                     *curr_hero = hero_name.to_string();
                                     println!("已切换到英雄: {}", hero_name);
+                                    println!("\n使用说明:");
+                                    println!("1. 这是一个全局键盘宏，请在游戏窗口中按键，不是在这里输入");
+                                    println!("2. 对于亚索(yasuo):");
+                                    println!("   - 先按E，然后在150ms内按R：将触发EQR连招");
+                                    println!("   - 先按E，然后在300ms内按D：将触发EQD连招");
+                                    println!("3. 对于瑞文(riven):");
+                                    println!("   - 请参考瑞文专用连招说明");
                                 }
                             } else {
                                 println!("错误: 英雄 '{}' 不存在", hero_name);
