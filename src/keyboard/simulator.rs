@@ -32,6 +32,14 @@ impl KeyboardSimulator {
                 &KeyAction::MouseClick(x, y, ref button) => {
                     self.mouse_click(x, y, button);
                 },
+                KeyAction::Down(key) => {
+                    debug!("只按下键: {:?}", key);
+                    self.press_key(key);
+                },
+                KeyAction::Up(key) => {
+                    debug!("只释放键: {:?}", key);
+                    self.release_key(key);
+                },
             }
         }
         
