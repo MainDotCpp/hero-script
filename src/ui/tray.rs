@@ -11,7 +11,9 @@ impl TrayMenu {
         hero_registry: Arc<Mutex<HeroRegistry>>,
         active_hero: Arc<Mutex<String>>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut tray = TrayItem::new("LOL宏", IconSource::Resource("")).unwrap();
+        // 使用Windows系统图标，shell32.dll包含很多内置图标
+        let icon_source = IconSource::Resource("shell32.dll,1");
+        let mut tray = TrayItem::new("LOL宏", icon_source)?;
         
         // 退出选项
         tray.add_menu_item("退出", move || {
