@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
-use log::{info, error, debug};
+use log::{info, error};
 use std::io::{self, Write};
 use std::thread;
 
 use crate::keyboard::{KeyboardListener, KeyboardSimulator};
-use crate::config::{ConfigManager, hero::HeroConfig};
+use crate::config::ConfigManager;
 use crate::macro_engine::MacroEngine;
 use crate::heroes::HeroRegistry;
 
@@ -82,14 +82,17 @@ impl App {
         }
         println!("---------------------------");
         
-        // 创建命令行交互线程
+        // 创建命令行交互线程，注意克隆 running 而非移动它
         let active_hero = self.active_hero.clone();
         let hero_registry = self.hero_registry.clone();
-        let running = self.running.clone();
+        let running_for_cli = self.running.clone();  // 为CLI线程克隆一份
         
         let cli_thread = thread::spawn(move || {
-            Self::command_line_interface(active_hero, hero_registry, running);
+            Self::command_line_interface(active_hero, hero_registry, running_for_cli);
         });
+        
+        // 再次克隆 running 用于异步闭包
+        let running_for_async = self.running.clone();
         
         // 运行直到收到退出信号
         self.runtime.block_on(async {
@@ -98,7 +101,7 @@ impl App {
             info!("收到退出信号，正在关闭程序...");
             
             // 设置运行标志为false，通知CLI线程退出
-            if let Ok(mut is_running) = running.lock() {
+            if let Ok(mut is_running) = running_for_async.lock() {
                 *is_running = false;
             }
         });
@@ -118,7 +121,7 @@ impl App {
     fn command_line_interface(
         active_hero: Arc<Mutex<String>>, 
         hero_registry: Arc<Mutex<HeroRegistry>>,
-        running: Arc<Mutex<bool>>,
+        running: Arc<Mutex<bool>>,  // 这里使用的是引用计数指针，不会拥有值
     ) {
         let mut input = String::new();
         
