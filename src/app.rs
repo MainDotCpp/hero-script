@@ -1,12 +1,13 @@
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
 use log::{info, error, debug};
+use std::io::{self, Write};
+use std::thread;
 
 use crate::keyboard::{KeyboardListener, KeyboardSimulator};
 use crate::config::{ConfigManager, hero::HeroConfig};
 use crate::macro_engine::MacroEngine;
 use crate::heroes::HeroRegistry;
-use crate::ui::TrayMenu;
 
 pub struct App {
     runtime: Runtime,
@@ -15,8 +16,8 @@ pub struct App {
     config_manager: Arc<Mutex<ConfigManager>>,
     macro_engine: Arc<MacroEngine>,
     hero_registry: Arc<Mutex<HeroRegistry>>,
-    tray_menu: Option<TrayMenu>,
     active_hero: Arc<Mutex<String>>,
+    running: Arc<Mutex<bool>>,
 }
 
 impl App {
@@ -46,8 +47,8 @@ impl App {
         // 初始化键盘监听器
         let keyboard_listener = Arc::new(KeyboardListener::new(macro_engine.clone())?);
         
-        // 创建系统托盘
-        let tray_menu = Some(TrayMenu::new(hero_registry.clone(), active_hero.clone())?);
+        // 程序运行标志
+        let running = Arc::new(Mutex::new(true));
         
         Ok(Self {
             runtime,
@@ -56,8 +57,8 @@ impl App {
             config_manager,
             macro_engine,
             hero_registry,
-            tray_menu,
             active_hero,
+            running,
         })
     }
     
@@ -68,20 +69,136 @@ impl App {
         info!("启动键盘监听器...");
         self.keyboard_listener.start()?;
         
-        info!("应用程序已启动，按Ctrl+Shift+F12切换英雄");
+        // 显示可用英雄列表
+        let hero_names = {
+            let registry = self.hero_registry.lock().unwrap();
+            registry.get_hero_names()
+        };
         
-        // 进入主事件循环
+        println!("\n======== LOL宏程序 ========");
+        println!("可用英雄:");
+        for (i, name) in hero_names.iter().enumerate() {
+            println!("{}) {}", i + 1, name);
+        }
+        println!("---------------------------");
+        
+        // 创建命令行交互线程
+        let active_hero = self.active_hero.clone();
+        let hero_registry = self.hero_registry.clone();
+        let running = self.running.clone();
+        
+        let cli_thread = thread::spawn(move || {
+            Self::command_line_interface(active_hero, hero_registry, running);
+        });
+        
+        // 运行直到收到退出信号
         self.runtime.block_on(async {
             // 等待程序结束信号
             tokio::signal::ctrl_c().await.unwrap();
             info!("收到退出信号，正在关闭程序...");
+            
+            // 设置运行标志为false，通知CLI线程退出
+            if let Ok(mut is_running) = running.lock() {
+                *is_running = false;
+            }
         });
+        
+        // 等待CLI线程结束
+        if cli_thread.join().is_err() {
+            error!("命令行交互线程异常退出");
+        }
         
         // 清理资源
         self.keyboard_listener.stop()?;
         
         info!("程序已退出");
         Ok(())
+    }
+    
+    fn command_line_interface(
+        active_hero: Arc<Mutex<String>>, 
+        hero_registry: Arc<Mutex<HeroRegistry>>,
+        running: Arc<Mutex<bool>>,
+    ) {
+        let mut input = String::new();
+        
+        while let Ok(is_running) = running.lock() {
+            if !*is_running {
+                break;
+            }
+            
+            // 显示当前英雄
+            if let Ok(hero) = active_hero.lock() {
+                print!("\n当前英雄: {} > ", hero);
+                io::stdout().flush().unwrap();
+            }
+            
+            // 读取命令
+            input.clear();
+            if io::stdin().read_line(&mut input).is_ok() {
+                let command = input.trim();
+                
+                // 处理命令
+                match command {
+                    "quit" | "exit" | "q" => {
+                        println!("正在退出...");
+                        if let Ok(mut is_running) = running.lock() {
+                            *is_running = false;
+                        }
+                        break;
+                    },
+                    "list" | "ls" | "l" => {
+                        // 显示可用英雄列表
+                        if let Ok(registry) = hero_registry.lock() {
+                            let heroes = registry.get_hero_names();
+                            println!("可用英雄列表:");
+                            for (i, name) in heroes.iter().enumerate() {
+                                println!("{}) {}", i + 1, name);
+                            }
+                        }
+                    },
+                    s if s.starts_with("switch ") || s.starts_with("s ") => {
+                        let parts: Vec<&str> = s.split_whitespace().collect();
+                        if parts.len() >= 2 {
+                            let hero_name = parts[1];
+                            
+                            // 检查英雄是否存在
+                            let hero_exists = {
+                                if let Ok(registry) = hero_registry.lock() {
+                                    registry.get_hero(hero_name).is_some()
+                                } else {
+                                    false
+                                }
+                            };
+                            
+                            if hero_exists {
+                                if let Ok(mut curr_hero) = active_hero.lock() {
+                                    *curr_hero = hero_name.to_string();
+                                    println!("已切换到英雄: {}", hero_name);
+                                }
+                            } else {
+                                println!("错误: 英雄 '{}' 不存在", hero_name);
+                            }
+                        } else {
+                            println!("用法: switch <英雄名称>");
+                        }
+                    },
+                    "help" | "h" | "?" => {
+                        println!("可用命令:");
+                        println!("  list (ls, l)       - 显示所有可用英雄");
+                        println!("  switch (s) <英雄>  - 切换到指定英雄");
+                        println!("  help (h, ?)        - 显示帮助信息");
+                        println!("  quit (q, exit)     - 退出程序");
+                    },
+                    "" => {
+                        // 忽略空行
+                    },
+                    _ => {
+                        println!("未知命令: {}. 输入 'help' 查看可用命令", command);
+                    }
+                }
+            }
+        }
     }
     
     fn load_heroes(&self) -> Result<(), Box<dyn std::error::Error>> {

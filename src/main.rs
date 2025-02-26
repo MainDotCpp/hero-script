@@ -3,7 +3,6 @@ mod keyboard;
 mod config;
 mod macro_engine;
 mod heroes;
-mod ui;
 mod error;
 
 use log::{info, error};

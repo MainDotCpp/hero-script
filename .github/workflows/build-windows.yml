@@ -44,21 +44,11 @@ jobs:
       with:
         name: lol-macro-windows
         path: artifacts/
-    
-    # 设置日期时间作为版本号的一部分
-    - name: Set current date as version
-      id: date
-      run: echo "::set-output name=date::$(date +'%Y.%m.%d.%H%M')"
-      shell: bash
         
     - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
-        name: Release v${{ steps.date.outputs.date }}
-        tag_name: v${{ steps.date.outputs.date }}
         files: artifacts/lol-macro.exe
-        generate_release_notes: true
-        draft: false
-        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
