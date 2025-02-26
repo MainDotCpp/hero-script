@@ -25,22 +25,12 @@ impl KeyboardSimulator {
                     // 添加短暂延迟确保按键被识别
                     thread::sleep(Duration::from_millis(50));
                 },
-                KeyAction::Release(key) => {
-                    self.release_key(key);
-                    thread::sleep(Duration::from_millis(50));
-                },
-                KeyAction::Type(key) => {
-                    self.press_key(key);
-                    thread::sleep(Duration::from_millis(50));
-                    self.release_key(key);
-                    thread::sleep(Duration::from_millis(50));
-                },
-                KeyAction::Delay(ms) => {
+                &KeyAction::Delay(ms) => {
                     debug!("延迟 {}ms", ms);
-                    thread::sleep(Duration::from_millis(*ms as u64));
+                    thread::sleep(Duration::from_millis(ms as u64));
                 },
-                KeyAction::MouseClick(x, y, button) => {
-                    self.mouse_click(*x, *y, button);
+                &KeyAction::MouseClick(x, y, ref button) => {
+                    self.mouse_click(x, y, button);
                 },
             }
         }
@@ -77,7 +67,7 @@ impl KeyboardSimulator {
         let (curr_x, curr_y) = self.enigo.mouse_location();
         
         // 移动鼠标
-        self.enigo.mouse_move_to(curr_x + x, curr_y + y);
+        self.enigo.mouse_move_to(x, y);
         
         // 点击
         match button {
@@ -89,7 +79,7 @@ impl KeyboardSimulator {
         // 移回原位置
         self.enigo.mouse_move_to(curr_x, curr_y);
         
-        debug!("模拟鼠标点击: 偏移({}, {}), 按钮: {:?}", x, y, button);
+        debug!("模拟鼠标点击: 位置({}, {}), 按钮: {:?}", x, y, button);
     }
     
     fn key_to_enigo_key(&self, key: &Key) -> Option<EnigoKey> {
@@ -120,7 +110,6 @@ impl KeyboardSimulator {
             Key::Alt => Some(EnigoKey::Alt),
             Key::Space => Some(EnigoKey::Space),
             Key::Enter => Some(EnigoKey::Return),
-            _ => None,
         }
     }
 } 

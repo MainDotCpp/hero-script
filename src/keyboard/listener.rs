@@ -4,6 +4,7 @@ use std::thread;
 use log::{debug, error, info};
 use winapi::um::winuser;
 use winapi::shared::windef::HWND;
+use winapi::shared::windef::HHOOK;
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use crate::macro_engine::MacroEngine;
@@ -12,7 +13,7 @@ use std::sync::mpsc::{channel, Sender, Receiver};
 
 // 低级键盘钩子使用的全局变量
 thread_local! {
-    static HOOK_HANDLE: Cell<Option<winapi::shared::minwindef::HHOOK>> = Cell::new(None);
+    static HOOK_HANDLE: Cell<Option<HHOOK>> = Cell::new(None);
     static MACRO_ENGINE: Cell<Option<Arc<MacroEngine>>> = Cell::new(None);
 }
 
