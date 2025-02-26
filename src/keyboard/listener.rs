@@ -118,27 +118,39 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
     let is_keydown = wparam as u32 == winuser::WM_KEYDOWN || wparam as u32 == winuser::WM_SYSKEYDOWN;
     let is_keyup = wparam as u32 == winuser::WM_KEYUP || wparam as u32 == winuser::WM_SYSKEYUP;
     
+    // 添加原始按键信息日志
+    debug!("原始按键事件 - 虚拟键码: {:#x}, wparam: {:#x}, 扫描码: {:#x}, 标志: {:#x}", 
+           key_info.vkCode, 
+           wparam,
+           key_info.scanCode,
+           key_info.flags);
+    
     if !is_keydown && !is_keyup {
         return winuser::CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam);
     }
     
     let key = virtual_key_to_key(key_code);
     
-    // 打印每个按键事件以便调试
-    debug!("捕获按键: {:?}, 虚拟键码: {:#x}, 状态: {}", 
-           key, key_code, if is_keydown { "按下" } else { "释放" });
+    // 打印每个按键事件的详细信息
+    info!("键盘事件: {} - 按键: {:?}, 虚拟键码: {:#x}", 
+          if is_keydown { "按下" } else { "释放" },
+          key,
+          key_code);
     
     let mut handled = false;
     
     MACRO_ENGINE.with(|cell| {
         if let Some(engine) = cell.take() {
             handled = engine.process_key_event(key, is_keydown);
+            if handled {
+                debug!("按键被宏引擎处理: {:?}", key);
+            }
             cell.set(Some(engine));
         }
     });
     
     if handled {
-        // 如果事件被处理，则阻止系统继续处理
+        debug!("按键被屏蔽: {:?}", key);
         return 1;
     }
     
@@ -146,8 +158,7 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
 }
 
 fn virtual_key_to_key(vk: u32) -> Key {
-    // 将Windows虚拟键码转换为我们的Key类型
-    match vk {
+    let key = match vk {
         0x1B => Key::Escape,
         0x09 => Key::Tab,
         0x14 => Key::CapsLock,
@@ -176,8 +187,11 @@ fn virtual_key_to_key(vk: u32) -> Key {
         
         // 未映射的键
         _ => {
-            debug!("未映射的键: {:#x}", vk);
+            debug!("未映射的虚拟键码: {:#x}", vk);
             Key::Character('\0')
         }
-    }
+    };
+    
+    debug!("虚拟键码 {:#x} 映射为 {:?}", vk, key);
+    key
 } 

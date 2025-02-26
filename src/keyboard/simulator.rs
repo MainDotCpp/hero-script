@@ -16,34 +16,35 @@ impl KeyboardSimulator {
     }
     
     pub fn execute_actions(&mut self, actions: &[KeyAction]) {
-        debug!("执行键盘动作: {:?}", actions);
+        info!("开始执行键盘动作序列: {:?}", actions);
         
         for action in actions {
             match action {
                 KeyAction::Press(key) => {
+                    info!("模拟按下并释放键: {:?}", key);
                     self.press_key(key);
-                    // 添加短暂延迟确保按键被识别
                     thread::sleep(Duration::from_millis(50));
                 },
                 &KeyAction::Delay(ms) => {
-                    debug!("延迟 {}ms", ms);
+                    info!("延迟 {}ms", ms);
                     thread::sleep(Duration::from_millis(ms as u64));
                 },
                 &KeyAction::MouseClick(x, y, ref button) => {
+                    info!("模拟鼠标点击: 位置({}, {}), 按钮: {:?}", x, y, button);
                     self.mouse_click(x, y, button);
                 },
                 KeyAction::Down(key) => {
-                    debug!("只按下键: {:?}", key);
+                    info!("模拟按下键: {:?}", key);
                     self.press_key(key);
                 },
                 KeyAction::Up(key) => {
-                    debug!("只释放键: {:?}", key);
+                    info!("模拟释放键: {:?}", key);
                     self.release_key(key);
                 },
             }
         }
         
-        debug!("键盘动作执行完成");
+        info!("键盘动作序列执行完成");
     }
     
     fn press_key(&mut self, key: &Key) {

@@ -44,16 +44,15 @@ impl MacroEngine {
     }
     
     pub fn process_key_event(&self, key: Key, is_down: bool) -> bool {
-        // 增加调试输出，显示接收到的按键
-        debug!("接收到按键: {:?}, 状态: {}", key, if is_down { "按下" } else { "释放" });
+        info!("宏引擎处理按键: {:?}, 状态: {}", key, if is_down { "按下" } else { "释放" });
         
         if !is_down {
             // 处理键松开
             let mut blocked_keys = self.blocked_keys.lock().unwrap();
             if blocked_keys.contains(&key) {
-                debug!("屏蔽已释放的按键: {:?}", key);
+                info!("屏蔽已释放的按键: {:?}", key);
                 blocked_keys.remove(&key);
-                return true; // 屏蔽按键传递
+                return true;
             }
             return false;
         }
@@ -62,18 +61,19 @@ impl MacroEngine {
         {
             let mut processor = self.event_processor.lock().unwrap();
             processor.set_key_state(key.clone(), true);
+            debug!("更新按键状态: {:?} = {}", key, true);
         }
         
         // 检查是否是英雄切换快捷键
         if self.check_hero_switch_hotkey(&key) {
-            debug!("触发了英雄切换快捷键");
+            info!("触发英雄切换快捷键: {:?}", key);
             return true;
         }
         
         // 处理按键序列
         self.update_key_sequence(&key);
         let current_sequence = self.get_current_sequence();
-        debug!("当前按键序列: {:?}", current_sequence);
+        info!("当前按键序列: {:?}", current_sequence);
         
         // 检查当前活跃英雄的连招
         let hero_name = self.active_hero.lock().unwrap().clone();
