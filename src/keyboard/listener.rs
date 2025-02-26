@@ -10,6 +10,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::macro_engine::MacroEngine;
 use crate::config::hero::Key;
 use std::sync::mpsc::{channel, Sender, Receiver};
+use winapi::um::libloaderapi::{LoadLibraryA, GetProcAddress};
+use std::ffi::CString;
 
 // 低级键盘钩子使用的全局变量
 thread_local! {
@@ -19,89 +21,65 @@ thread_local! {
 
 static HOOK_RUNNING: AtomicBool = AtomicBool::new(false);
 
+type InstallHookFn = unsafe extern "system" fn(*mut i32) -> bool;
+type UninstallHookFn = unsafe extern "system" fn() -> bool;
+
 pub struct KeyboardListener {
     macro_engine: Arc<MacroEngine>,
-    key_sender: Mutex<Option<Sender<(Key, bool)>>>,
+    dll_handle: Mutex<Option<HINSTANCE>>,
+    window_handle: *mut i32, // 用于接收消息的窗口句柄
 }
 
 impl KeyboardListener {
     pub fn new(macro_engine: Arc<MacroEngine>) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             macro_engine,
-            key_sender: Mutex::new(None),
+            dll_handle: Mutex::new(None),
+            window_handle: std::ptr::null_mut(),
         })
     }
     
     pub fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // 创建通道用于消息传递
-        let (sender, receiver) = channel();
-        {
-            let mut key_sender = self.key_sender.lock().unwrap();
-            *key_sender = Some(sender);
-        }
-        
-        // 设置线程本地变量
-        MACRO_ENGINE.with(|cell| {
-            cell.set(Some(self.macro_engine.clone()));
-        });
-        
-        // 启动处理键盘事件的线程
-        let engine = self.macro_engine.clone();
-        thread::spawn(move || {
-            Self::process_key_events(receiver, engine);
-        });
-        
-        // 设置钩子
         unsafe {
-            let hook_handle = winuser::SetWindowsHookExA(
-                winuser::WH_KEYBOARD_LL,
-                Some(keyboard_hook_proc),
-                std::ptr::null_mut(),
-                0,
-            );
+            // 加载 DLL
+            let dll_name = CString::new("keyboard_hook.dll")?;
+            let handle = LoadLibraryA(dll_name.as_ptr());
             
-            if hook_handle.is_null() {
-                let error = std::io::Error::last_os_error();
-                error!("设置键盘钩子失败: {}", error);
-                return Err(Box::new(error));
+            if handle.is_null() {
+                return Err("Failed to load keyboard_hook.dll".into());
             }
             
-            HOOK_HANDLE.with(|cell| {
-                cell.set(Some(hook_handle));
-            });
+            // 获取函数地址
+            let install_hook: InstallHookFn = std::mem::transmute(
+                GetProcAddress(handle, CString::new("install_hook")?.as_ptr())
+            );
+            
+            // 安装钩子
+            if !install_hook(self.window_handle) {
+                return Err("Failed to install keyboard hook".into());
+            }
+            
+            *self.dll_handle.lock().unwrap() = Some(handle);
         }
         
-        HOOK_RUNNING.store(true, Ordering::SeqCst);
         info!("键盘监听器已启动");
-        
         Ok(())
     }
     
-    fn process_key_events(receiver: Receiver<(Key, bool)>, engine: Arc<MacroEngine>) {
-        info!("按键处理线程已启动");
-        while let Ok((key, is_down)) = receiver.recv() {
-            debug!("处理按键: {:?}, 状态: {}", key, if is_down { "按下" } else { "释放" });
-            engine.process_key_event(key.clone(), is_down);
-        }
-        info!("按键处理线程已停止");
-    }
-    
     pub fn stop(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // 清理钩子
-        HOOK_HANDLE.with(|cell| {
-            if let Some(hook) = cell.take() {
-                unsafe {
-                    if winuser::UnhookWindowsHookEx(hook) == 0 {
-                        let error = std::io::Error::last_os_error();
-                        error!("清理键盘钩子失败: {}", error);
-                    }
+        unsafe {
+            if let Some(handle) = *self.dll_handle.lock().unwrap() {
+                let uninstall_hook: UninstallHookFn = std::mem::transmute(
+                    GetProcAddress(handle, CString::new("uninstall_hook")?.as_ptr())
+                );
+                
+                if !uninstall_hook() {
+                    return Err("Failed to uninstall keyboard hook".into());
                 }
             }
-        });
+        }
         
-        HOOK_RUNNING.store(false, Ordering::SeqCst);
         info!("键盘监听器已停止");
-        
         Ok(())
     }
 }

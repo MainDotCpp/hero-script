@@ -1,0 +1,19 @@
+[package]
+name = "keyboard-hook"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+winapi = { version = "0.3", features = [
+    "winuser",
+    "errhandlingapi",
+    "libloaderapi",
+    "processthreadsapi",
+    "windef",
+    "minwindef",
+    "winnt",
+]}
+log = "0.4" 

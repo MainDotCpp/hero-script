@@ -30,15 +30,22 @@ jobs:
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
         
-    - name: Build
+    - name: Build DLL
+      run: |
+        cd keyboard-hook
+        cargo build --release
+        cd ..
+        
+    - name: Build Main Program
       run: cargo build --release
       
     - name: Create artifacts directory
       run: mkdir artifacts
       
-    - name: Copy binary to artifacts
+    - name: Copy binaries to artifacts
       run: |
         cp target/release/lol-macro.exe artifacts/
+        cp target/release/keyboard_hook.dll artifacts/
         cp README.md artifacts/ || echo "No README found"
         
     - name: Upload artifacts
