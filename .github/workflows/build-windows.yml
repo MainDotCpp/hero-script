@@ -1,0 +1,54 @@
+name: Build Windows Binary
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # 允许手动触发
+
+env:
+  CARGO_TERM_COLOR: always
+  
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-pc-windows-msvc
+        override: true
+        profile: minimal
+        
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2
+        
+    - name: Build
+      run: cargo build --release
+      
+    - name: Create artifacts directory
+      run: mkdir artifacts
+      
+    - name: Copy binary to artifacts
+      run: |
+        cp target/release/lol-macro.exe artifacts/
+        cp README.md artifacts/ || echo "No README found"
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: lol-macro-windows
+        path: artifacts/
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: artifacts/lol-macro.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
