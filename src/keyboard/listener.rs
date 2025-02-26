@@ -126,9 +126,11 @@ fn process_key_event(code: i32, wparam: usize, lparam: isize) -> bool {
     let mut handled = false;
     
     MACRO_ENGINE.with(|cell| {
-        if let Some(engine) = cell.get() {
+        if let Some(engine) = cell.take() {
             // 传递按键事件到宏引擎
             handled = engine.process_key_event(key, is_keydown);
+            // 放回引用计数的值
+            cell.set(Some(engine));
         }
     });
     
@@ -149,7 +151,16 @@ fn virtual_key_to_key(vk: u32) -> Key {
         // 功能键
         0x70 => Key::F1,
         0x71 => Key::F2,
-        // 更多按键...
+        0x72 => Key::F3,
+        0x73 => Key::F4,
+        0x74 => Key::F5,
+        0x75 => Key::F6,
+        0x76 => Key::F7,
+        0x77 => Key::F8,
+        0x78 => Key::F9,
+        0x79 => Key::F10,
+        0x7A => Key::F11,
+        0x7B => Key::F12,
         
         // 字母和数字
         vk @ 0x30..=0x39 => Key::Character((vk as u8 - 0x30 + b'0') as char),

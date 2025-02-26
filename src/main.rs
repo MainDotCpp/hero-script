@@ -4,8 +4,10 @@ mod config;
 mod macro_engine;
 mod heroes;
 mod ui;
+mod error;
 
 use log::{info, error};
+use error::AppResult;
 
 fn main() {
     // 初始化日志
