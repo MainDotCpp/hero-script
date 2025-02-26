@@ -4,6 +4,7 @@ use log::{info, error};
 use std::io::{self, Write};
 use std::thread;
 use winapi::um::winuser::{GetMessageA, TranslateMessage, DispatchMessageA, MSG};
+use winapi::shared::minwindef::BOOL;
 
 use crate::keyboard::{KeyboardListener, KeyboardSimulator};
 use crate::config::ConfigManager;
@@ -64,58 +65,8 @@ impl App {
     }
     
     pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("加载英雄配置...");
-        self.load_heroes()?;
-        
-        info!("启动键盘监听器...");
-        self.keyboard_listener.start()?;
-        
-        // 显示可用英雄列表
-        let hero_names = {
-            let registry = self.hero_registry.lock().unwrap();
-            registry.get_hero_names()
-        };
-        
-        println!("\n======== LOL宏程序 ========");
-        println!("可用英雄:");
-        for (i, name) in hero_names.iter().enumerate() {
-            println!("{}) {}", i + 1, name);
-        }
-        println!("---------------------------");
-        
-        // 创建命令行交互线程，注意克隆 running 而非移动它
-        let active_hero = self.active_hero.clone();
-        let hero_registry = self.hero_registry.clone();
-        let running_for_cli = self.running.clone();  // 为CLI线程克隆一份
-        
-        let cli_thread = thread::spawn(move || {
-            Self::command_line_interface(active_hero, hero_registry, running_for_cli);
-        });
-        
-        // 再次克隆 running 用于异步闭包
-        let running_for_async = self.running.clone();
-        
-        // 运行直到收到退出信号
-        self.runtime.block_on(async {
-            // 等待程序结束信号
-            tokio::signal::ctrl_c().await.unwrap();
-            info!("收到退出信号，正在关闭程序...");
-            
-            // 设置运行标志为false，通知CLI线程退出
-            if let Ok(mut is_running) = running_for_async.lock() {
-                *is_running = false;
-            }
-        });
-        
-        // 等待CLI线程结束
-        if cli_thread.join().is_err() {
-            error!("命令行交互线程异常退出");
-        }
-        
-        // 清理资源
-        self.keyboard_listener.stop()?;
-        
-        info!("程序已退出");
+        info!("启动消息循环...");
+        Self::run_message_loop();
         Ok(())
     }
     

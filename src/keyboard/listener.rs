@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 use std::thread;
 use log::{debug, error, info};
 use winapi::um::winuser;
-use winapi::shared::windef::HWND;
-use winapi::shared::windef::HHOOK;
+use winapi::shared::minwindef::{WPARAM, LPARAM, LRESULT, DWORD};
+use winapi::shared::windef::{HHOOK, HWND};
 use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use crate::macro_engine::MacroEngine;
@@ -107,7 +107,9 @@ impl KeyboardListener {
 }
 
 // 处理键盘事件的回调函数
-unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: isize) -> isize {
+unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    info!("键盘钩子被调用: code={}, wparam={}, lparam={}", code, wparam, lparam);
+    
     if !HOOK_RUNNING.load(Ordering::SeqCst) || code < 0 {
         return winuser::CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam);
     }

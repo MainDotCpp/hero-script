@@ -8,11 +8,19 @@ description = "A League of Legends keyboard macro program"
 [dependencies]
 # 键盘/鼠标监听和模拟
 device_query = "1.1.3"     # 键盘监听
-enigo = "0.1.3"            # 键盘鼠标模拟
-winapi = { version = "0.3.9", features = ["winuser", "windef"] } # 用于低级键盘钩子和模拟
+enigo = "0.1.2"            # 键盘鼠标模拟
+winapi = { version = "0.3", features = [
+    "winuser",       # 用于键盘钩子
+    "errhandlingapi", # 用于错误处理
+    "libloaderapi",   # 用于加载DLL
+    "processthreadsapi", # 用于线程相关功能
+    "windef",        # 用于Windows类型定义
+    "minwindef",     # 用于基本类型定义
+    "winnt",         # 用于NT相关定义
+]}
 
 # 异步处理
-tokio = { version = "1.28.2", features = ["full"] }
+tokio = { version = "1.0", features = ["full"] }
 
 # 配置相关
 serde = { version = "1.0", features = ["derive"] }
@@ -21,7 +29,7 @@ toml = "0.8.6"
 
 # 工具库
 log = "0.4"
-env_logger = "0.10.0"
+env_logger = "0.10"
 thiserror = "1.0"          # 错误处理
 chrono = "0.4"             # 时间处理
 once_cell = "1.18.0"       # 单例模式实现 
