@@ -123,14 +123,24 @@ fn process_key_event(code: i32, wparam: usize, lparam: isize) -> bool {
     
     let key = virtual_key_to_key(key_code);
     
+    // 增加日志以便追踪
+    if is_keydown {
+        debug!("键盘钩子: 按键按下 - VK: {:#x}, 转换为: {:?}", key_code, key);
+    } else {
+        debug!("键盘钩子: 按键释放 - VK: {:#x}, 转换为: {:?}", key_code, key);
+    }
+    
     let mut handled = false;
     
     MACRO_ENGINE.with(|cell| {
         if let Some(engine) = cell.take() {
             // 传递按键事件到宏引擎
             handled = engine.process_key_event(key, is_keydown);
+            debug!("宏引擎处理结果: {}", if handled { "已处理" } else { "未处理" });
             // 放回引用计数的值
             cell.set(Some(engine));
+        } else {
+            error!("无法访问宏引擎");
         }
     });
     

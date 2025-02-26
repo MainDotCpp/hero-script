@@ -4,8 +4,8 @@ mod timing;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use std::collections::{HashMap, VecDeque, HashSet};
-use log::{debug, info, warn};
+use std::collections::{VecDeque, HashSet};
+use log::{debug, info, warn, error};
 
 use crate::config::hero::{Key, ComboTrigger, ComboAction, KeyAction};
 use crate::keyboard::simulator::KeyboardSimulator;
@@ -44,42 +44,61 @@ impl MacroEngine {
     }
     
     pub fn process_key_event(&self, key: Key, is_down: bool) -> bool {
+        // 增加调试输出，显示接收到的按键
+        debug!("接收到按键: {:?}, 状态: {}", key, if is_down { "按下" } else { "释放" });
+        
         if !is_down {
             // 处理键松开
             let mut blocked_keys = self.blocked_keys.lock().unwrap();
             if blocked_keys.contains(&key) {
+                debug!("屏蔽已释放的按键: {:?}", key);
                 blocked_keys.remove(&key);
                 return true; // 屏蔽按键传递
             }
             return false;
         }
         
-        // 检查是否是英雄切换快捷键 (例如 Ctrl+Shift+F12)
+        // 更新事件处理器中的按键状态
+        {
+            let mut processor = self.event_processor.lock().unwrap();
+            processor.set_key_state(key.clone(), true);
+        }
+        
+        // 检查是否是英雄切换快捷键
         if self.check_hero_switch_hotkey(&key) {
+            debug!("触发了英雄切换快捷键");
             return true;
         }
         
         // 处理按键序列
         self.update_key_sequence(&key);
+        let current_sequence = self.get_current_sequence();
+        debug!("当前按键序列: {:?}", current_sequence);
         
         // 检查当前活跃英雄的连招
         let hero_name = self.active_hero.lock().unwrap().clone();
+        info!("检查英雄 [{}] 的连招", hero_name);
         let hero_registry = self.hero_registry.lock().unwrap();
         
         if let Some(hero_config) = hero_registry.get_hero(&hero_name) {
+            debug!("找到英雄 [{}] 的配置，检查连招", hero_name);
             // 检查是否触发了任何连招
             for (combo_name, (trigger, action)) in &hero_config.combos {
+                debug!("检查连招: {} 触发条件: {:?}", combo_name, trigger.keys);
+                
                 if self.check_combo_trigger(trigger) {
-                    debug!("触发连招: {}", combo_name);
+                    info!("触发连招: {}", combo_name);
                     
-                    // 修复：克隆整个KeyboardSimulator而不是引用
+                    // 创建新的键盘模拟器实例
                     let mut simulator = KeyboardSimulator::new();
                     
                     // 执行连招动作
+                    debug!("执行连招动作: {:?}", action.keys);
                     simulator.execute_actions(&action.keys);
                     
                     // 更新屏蔽按键
                     if !trigger.block_keys.is_empty() {
+                        debug!("设置屏蔽按键: {:?}", trigger.block_keys);
                         let mut blocked = self.blocked_keys.lock().unwrap();
                         for key in &trigger.block_keys {
                             blocked.insert(key.clone());
@@ -89,86 +108,96 @@ impl MacroEngine {
                     return action.block_original;
                 }
             }
+        } else {
+            warn!("未找到英雄 [{}] 的配置", hero_name);
         }
         
         false
+    }
+    
+    fn check_combo_trigger(&self, trigger: &ComboTrigger) -> bool {
+        // 检查是否满足时间窗口条件
+        if let Some(time_window) = trigger.time_window {
+            debug!("检查时间窗口连招，窗口: {}ms", time_window);
+            // 从按键序列中检查是否按下了触发按键序列
+            let sequence = self.key_sequence.lock().unwrap();
+            
+            // 检查序列是否为空
+            if sequence.len() < trigger.keys.len() {
+                debug!("按键序列长度不足");
+                return false;
+            }
+            
+            // 创建一个映射来跟踪每个按键的最后出现时间
+            let mut key_times = std::collections::HashMap::new();
+            for (key, time) in sequence.iter() {
+                key_times.insert(key, *time);
+            }
+            
+            // 检查所有触发键是否都存在
+            for key in &trigger.keys {
+                if !key_times.contains_key(key) {
+                    debug!("按键 {:?} 不在序列中", key);
+                    return false;
+                }
+            }
+            
+            // 检查按键之间的时间差是否在时间窗口内
+            let first_key_time = *key_times.get(&trigger.keys[0]).unwrap();
+            for i in 1..trigger.keys.len() {
+                let key_time = *key_times.get(&trigger.keys[i]).unwrap();
+                let diff = key_time.duration_since(first_key_time).as_millis();
+                debug!("按键 {:?} 和 {:?} 时间差: {}ms", trigger.keys[0], trigger.keys[i], diff);
+                
+                if diff > time_window as u128 {
+                    debug!("时间差超过窗口");
+                    return false;
+                }
+            }
+            
+            debug!("满足时间窗口条件");
+            return true;
+        } else {
+            // 检查是否同时按下了所有触发键
+            debug!("检查同时按键连招");
+            let processor = self.event_processor.lock().unwrap();
+            let result = processor.are_keys_down(&trigger.keys);
+            debug!("同时按键检查结果: {}", result);
+            return result;
+        }
     }
     
     fn update_key_sequence(&self, key: &Key) {
         let now = Instant::now();
         let mut sequence = self.key_sequence.lock().unwrap();
         
-        // 添加新按键
+        // 添加新按键到序列
         sequence.push_back((key.clone(), now));
         
-        // 移除过时的按键
+        // 移除过期的按键
         while !sequence.is_empty() {
-            if now.duration_since(sequence.front().unwrap().1) > self.sequence_window {
-                sequence.pop_front();
-            } else {
-                break;
+            if let Some((_, time)) = sequence.front() {
+                if now.duration_since(*time) > self.sequence_window {
+                    sequence.pop_front();
+                } else {
+                    break;
+                }
             }
         }
     }
     
-    fn check_combo_trigger(&self, trigger: &ComboTrigger) -> bool {
+    fn get_current_sequence(&self) -> Vec<Key> {
         let sequence = self.key_sequence.lock().unwrap();
-        
-        // 检查序列长度
-        if sequence.len() < trigger.sequence.len() {
-            return false;
-        }
-        
-        // 提取最近的N个按键进行比较
-        let recent_keys: Vec<&Key> = sequence.iter()
-            .map(|(k, _)| k)
-            .rev()
-            .take(trigger.sequence.len())
-            .collect();
-        
-        // 反转以匹配原始顺序
-        let recent_keys: Vec<&Key> = recent_keys.into_iter().rev().collect();
-        
-        // 检查按键序列是否匹配
-        for (i, key) in trigger.sequence.iter().enumerate() {
-            if key != recent_keys[i] {
-                return false;
-            }
-        }
-        
-        // 检查时间窗口
-        if let Some(window_ms) = trigger.time_window {
-            let window = Duration::from_millis(window_ms);
-            let first_key_time = sequence.iter()
-                .rev()
-                .take(trigger.sequence.len())
-                .last()
-                .unwrap()
-                .1;
-            let last_key_time = sequence.iter().last().unwrap().1;
-            
-            if last_key_time.duration_since(first_key_time) > window {
-                return false;
-            }
-        }
-        
-        true
+        sequence.iter().map(|(key, _)| key.clone()).collect()
     }
     
     fn check_hero_switch_hotkey(&self, key: &Key) -> bool {
-        // 这里仅为示例，检查是否按下了 Ctrl+Shift+F12
-        // 实际应用中应当检查完整的组合键状态
-        if let Key::F12 = key {
-            // 通过UI切换英雄
-            // ...
-            return true;
-        }
-        
-        // 检查是否是某个英雄的专属快捷键
         let hero_registry = self.hero_registry.lock().unwrap();
-        for hero_name in hero_registry.get_hero_names() {
-            if let Some(hero) = hero_registry.get_hero(&hero_name) {
-                if let Some(hotkey) = &hero.hotkey {
+        let hero_names = hero_registry.get_hero_names();
+        
+        for hero_name in &hero_names {
+            if let Some(hero_config) = hero_registry.get_hero(hero_name) {
+                if let Some(hotkey) = &hero_config.hotkey {
                     if hotkey.len() == 1 && &hotkey[0] == key {
                         let mut active = self.active_hero.lock().unwrap();
                         *active = hero_name.clone();

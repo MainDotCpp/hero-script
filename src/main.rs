@@ -5,14 +5,19 @@ mod macro_engine;
 mod heroes;
 mod error;
 
-use log::{info, error};
+use log::{info, error, debug, LevelFilter};
+use env_logger::Builder;
 use error::AppResult;
 
 fn main() {
-    // 初始化日志
-    env_logger::init();
+    // 设置更详细的日志级别
+    let mut builder = Builder::new();
+    builder
+        .filter_level(LevelFilter::Debug)  // 设置为Debug级别，显示更多信息
+        .init();
     
     info!("LOL宏程序启动中...");
+    debug!("调试模式已启用");
     
     // 启动应用
     match app::App::new() {
