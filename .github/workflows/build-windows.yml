@@ -9,6 +9,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-C target-cpu=native" # 优化编译性能
   
 jobs:
   build:
@@ -24,12 +25,27 @@ jobs:
         target: x86_64-pc-windows-msvc
         override: true
         profile: minimal
+        components: rustfmt, clippy # 添加rustfmt和clippy组件
         
     - name: Rust Cache
       uses: Swatinem/rust-cache@v2
         
+    - name: Install dependencies
+      run: |
+        rustup component add rustfmt
+        rustup component add clippy
+        
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+      
+    - name: Run clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+      
     - name: Build
       run: cargo build --release
+      
+    - name: Run tests
+      run: cargo test --release
       
     - name: Create artifacts directory
       run: mkdir artifacts

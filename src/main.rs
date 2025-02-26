@@ -7,7 +7,6 @@ mod error;
 
 use log::{info, error, debug, LevelFilter};
 use env_logger::Builder;
-use error::AppResult;
 
 fn main() {
     // 设置更详细的日志级别

@@ -81,7 +81,7 @@ impl KeyboardListener {
         info!("按键处理线程已启动");
         while let Ok((key, is_down)) = receiver.recv() {
             debug!("处理按键: {:?}, 状态: {}", key, if is_down { "按下" } else { "释放" });
-            engine.process_key_event(key, is_down);
+            engine.process_key_event(key.clone(), is_down);
         }
         info!("按键处理线程已停止");
     }
@@ -141,7 +141,7 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: usize, lparam: i
     
     MACRO_ENGINE.with(|cell| {
         if let Some(engine) = cell.take() {
-            handled = engine.process_key_event(key, is_keydown);
+            handled = engine.process_key_event(key.clone(), is_keydown);
             if handled {
                 debug!("按键被宏引擎处理: {:?}", key);
             }

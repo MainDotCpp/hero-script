@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use crate::config::hero::{HeroConfig, Key};
 
 pub fn create_empty_config(name: &str) -> HeroConfig {

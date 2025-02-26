@@ -1,6 +1,6 @@
 use std::time::Duration;
 use std::thread;
-use log::{debug, error};
+use log::{debug, error, info};
 use enigo::{Enigo, Key as EnigoKey, KeyboardControllable, MouseControllable, MouseButton as EnigoMouseButton};
 use crate::config::hero::{Key, KeyAction, MouseButton};
 
