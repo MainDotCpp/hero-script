@@ -12,7 +12,7 @@ fn main() {
     // 设置更详细的日志级别
     let mut builder = Builder::new();
     builder
-        .filter_level(LevelFilter::Debug)  // 设置为Debug级别，显示更多信息
+        .filter_level(LevelFilter::Trace)  // 设置为Trace级别，显示所有日志
         .init();
     
     info!("LOL宏程序启动中...");
@@ -21,6 +21,7 @@ fn main() {
     // 启动应用
     match app::App::new() {
         Ok(mut app) => {
+            info!("应用初始化成功");
             if let Err(e) = app.run() {
                 error!("应用运行错误: {}", e);
             }
