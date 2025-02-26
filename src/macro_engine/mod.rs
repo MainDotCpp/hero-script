@@ -84,7 +84,7 @@ impl MacroEngine {
             debug!("找到英雄 [{}] 的配置，检查连招", hero_name);
             // 检查是否触发了任何连招
             for (combo_name, (trigger, action)) in &hero_config.combos {
-                debug!("检查连招: {} 触发条件: {:?}", combo_name, trigger.keys);
+                debug!("检查连招: {} 触发条件: {:?}", combo_name, trigger.sequence);
                 
                 if self.check_combo_trigger(trigger) {
                     info!("触发连招: {}", combo_name);
@@ -123,7 +123,7 @@ impl MacroEngine {
             let sequence = self.key_sequence.lock().unwrap();
             
             // 检查序列是否为空
-            if sequence.len() < trigger.keys.len() {
+            if sequence.len() < trigger.sequence.len() {
                 debug!("按键序列长度不足");
                 return false;
             }
@@ -135,7 +135,7 @@ impl MacroEngine {
             }
             
             // 检查所有触发键是否都存在
-            for key in &trigger.keys {
+            for key in &trigger.sequence {
                 if !key_times.contains_key(key) {
                     debug!("按键 {:?} 不在序列中", key);
                     return false;
@@ -143,11 +143,11 @@ impl MacroEngine {
             }
             
             // 检查按键之间的时间差是否在时间窗口内
-            let first_key_time = *key_times.get(&trigger.keys[0]).unwrap();
-            for i in 1..trigger.keys.len() {
-                let key_time = *key_times.get(&trigger.keys[i]).unwrap();
+            let first_key_time = *key_times.get(&trigger.sequence[0]).unwrap();
+            for i in 1..trigger.sequence.len() {
+                let key_time = *key_times.get(&trigger.sequence[i]).unwrap();
                 let diff = key_time.duration_since(first_key_time).as_millis();
-                debug!("按键 {:?} 和 {:?} 时间差: {}ms", trigger.keys[0], trigger.keys[i], diff);
+                debug!("按键 {:?} 和 {:?} 时间差: {}ms", trigger.sequence[0], trigger.sequence[i], diff);
                 
                 if diff > time_window as u128 {
                     debug!("时间差超过窗口");
@@ -161,7 +161,7 @@ impl MacroEngine {
             // 检查是否同时按下了所有触发键
             debug!("检查同时按键连招");
             let processor = self.event_processor.lock().unwrap();
-            let result = processor.are_keys_down(&trigger.keys);
+            let result = processor.are_keys_down(&trigger.sequence);
             debug!("同时按键检查结果: {}", result);
             return result;
         }
