@@ -3,6 +3,7 @@ use tokio::runtime::Runtime;
 use log::{info, error};
 use std::io::{self, Write};
 use std::thread;
+use winapi::um::winuser::{GetMessageA, TranslateMessage, DispatchMessageA, MSG};
 
 use crate::keyboard::{KeyboardListener, KeyboardSimulator};
 use crate::config::ConfigManager;
@@ -230,5 +231,15 @@ impl App {
         info!("已加载 {} 个英雄配置", registry.get_hero_names().len());
         
         Ok(())
+    }
+
+    fn run_message_loop() {
+        unsafe {
+            let mut msg: MSG = std::mem::zeroed();
+            while GetMessageA(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+                TranslateMessage(&msg);
+                DispatchMessageA(&msg);
+            }
+        }
     }
 } 
